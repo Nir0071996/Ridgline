@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ridgeline — Elevation Profile Smoother · by Nirjhar Jyoti Biswas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#F6F1E3;
+    --bg-2:#FFFFFF;
+    --panel:#FFFDF8;
+    --panel-2:#F3EDDD;
+    --ink:#26201A;
+    --ink-soft:#7C6F5C;
+    --line:#E4D9BE;
+
+    --e1:#2F6B4A;
+    --e2:#8FA83C;
+    --e3:#E0B347;
+    --e4:#C1682B;
+    --e5:#8B3A2B;
+
+    --raw:#C1443B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 1200px 500px at 50% -10%, rgba(224,179,71,0.12), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  .contours{ position:absolute; inset:0; z-index:0; pointer-events:none; opacity:0.22; }
+
+  .wrap{ position:relative; z-index:1; max-width:1180px; margin:0 auto; padding:36px 24px 80px; }
+
+  header{ margin-bottom:32px; }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--ink-soft); margin:0 0 10px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{
+    content:''; width:26px; height:3px; display:inline-block; border-radius:2px;
+    background:linear-gradient(90deg,var(--e1),var(--e2),var(--e3),var(--e4),var(--e5));
+  }
+  h1{
+    font-family:'Spectral',serif; font-weight:700; font-size:clamp(32px,5vw,52px);
+    margin:0 0 10px; letter-spacing:-0.01em; line-height:1.02;
+    color:var(--ink);
+  }
+  .sub{ color:var(--ink-soft); font-size:15px; max-width:560px; line-height:1.5; margin:0; }
+
+  .grid{ display:grid; grid-template-columns: 300px 1fr; gap:20px; align-items:start; }
+  @media (max-width:860px){ .grid{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:3px;
+    position:relative;
+    overflow:hidden;
+  }
+  .panel::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,var(--e1),var(--e2),var(--e3),var(--e4),var(--e5));
+  }
+
+  .controls{ padding:24px 20px 26px; display:flex; flex-direction:column; gap:22px; }
+  .field-label{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-soft); margin-bottom:8px; display:flex; justify-content:space-between;
+  }
+  .field-label span.val{ color:var(--e3); font-weight:500; }
+
+  textarea{
+    width:100%; min-height:110px; resize:vertical;
+    background:var(--bg-2); border:1px solid var(--line); border-radius:2px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink);
+    padding:10px; line-height:1.5;
+  }
+  textarea:focus{ outline:2px solid var(--e3); outline-offset:1px; }
+
+  .filebtn{
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:500;
+    color:var(--ink); background:var(--bg-2); border:1px solid var(--line);
+    padding:9px 12px; border-radius:2px; cursor:pointer; width:100%; justify-content:center;
+    transition:border-color .15s;
+  }
+  .filebtn:hover{ border-color:var(--e3); }
+  input[type=file]{ display:none; }
+
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:4px; border-radius:3px;
+    background:linear-gradient(90deg,var(--e1),var(--e2),var(--e3),var(--e4),var(--e5));
+    outline:none; margin-top:4px; opacity:0.9;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
+    background:var(--panel); border:2px solid var(--ink); box-shadow:0 1px 2px rgba(0,0,0,0.2);
+    cursor:pointer; margin-top:-6px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:15px; height:15px; border-radius:50%;
+    background:var(--panel); border:2px solid var(--ink); box-shadow:0 1px 2px rgba(0,0,0,0.2);
+    cursor:pointer;
+  }
+
+  .toggle-row{ display:flex; align-items:center; justify-content:space-between; }
+  .toggle-row .field-label{ margin:0; }
+  .switch{ position:relative; width:34px; height:18px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider-tog{ position:absolute; inset:0; background:var(--line); border-radius:20px; cursor:pointer; transition:.15s; }
+  .slider-tog::before{
+    content:''; position:absolute; width:14px; height:14px; left:2px; top:2px;
+    background:var(--ink); border-radius:50%; transition:.15s;
+  }
+  .switch input:checked + .slider-tog{ background:var(--e2); }
+  .switch input:checked + .slider-tog::before{ transform:translateX(16px); background:var(--panel); }
+
+  .stats{ padding:18px 20px 20px; border-top:1px solid var(--line); }
+  .stats h3{
+    font-family:'Spectral',serif; font-size:13px; font-weight:600; margin:0 0 12px;
+    text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft);
+  }
+  .stat-row{ display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px dashed var(--line); font-size:12.5px; }
+  .stat-row:last-child{ border-bottom:none; }
+  .stat-row .k{ color:var(--ink-soft); }
+  .stat-row .v{ font-family:'JetBrains Mono',monospace; font-weight:500; }
+  .stat-row .v.delta{ color:var(--e3); }
+
+  .downloadbtn{
+    margin:18px 20px 20px; display:block; width:calc(100% - 40px); text-align:center;
+    background:linear-gradient(90deg,var(--e1),var(--e2) 40%,var(--e3) 75%,var(--e4));
+    color:#FFFDF6; font-family:'Inter',sans-serif; font-weight:600; font-size:13px;
+    padding:12px; border:none; border-radius:2px; cursor:pointer; letter-spacing:.02em;
+    text-shadow:0 1px 1px rgba(0,0,0,0.15);
+    transition:filter .15s;
+  }
+  .downloadbtn:hover{ filter:brightness(1.1); }
+
+  .chart-panel{ padding:20px 20px 8px; min-height:520px; display:flex; flex-direction:column; }
+  .chart-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap; gap:10px; }
+  .chart-head h2{ font-family:'Spectral',serif; font-size:18px; font-weight:600; margin:0 0 8px; color:var(--ink); }
+  .elev-legend{ display:flex; align-items:center; gap:8px; }
+  .elev-legend .bar{
+    width:130px; height:8px; border-radius:4px;
+    background:linear-gradient(90deg,var(--e1),var(--e2),var(--e3),var(--e4),var(--e5));
+  }
+  .elev-legend .lab{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ink-soft); letter-spacing:.05em; }
+  .legend{ display:flex; gap:16px; font-size:11.5px; color:var(--ink-soft); align-items:center; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend .sw{ width:16px; height:2px; display:inline-block; }
+  .legend .sw.raw{ background:var(--raw); opacity:.7; }
+  .legend .sw.smooth{ height:3px; border-radius:2px; background:linear-gradient(90deg,var(--e2),var(--e4)); }
+
+  #chartHolder{ flex:1; min-height:420px; }
+  svg#chart{ width:100%; height:100%; display:block; }
+
+  .axis-label{ font-family:'JetBrains Mono',monospace; font-size:10px; fill:var(--ink-soft); }
+  .gridline{ stroke:var(--line); stroke-width:1; }
+
+  .empty-msg{
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft);
+    text-align:center; padding:60px 20px;
+  }
+
+  footer{ margin-top:26px; font-size:11.5px; color:var(--ink-soft); font-family:'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+
+<svg class="contours" viewBox="0 0 1400 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#2F6B4A"/>
+      <stop offset="35%" stop-color="#8FA83C"/>
+      <stop offset="65%" stop-color="#E0B347"/>
+      <stop offset="85%" stop-color="#C1682B"/>
+      <stop offset="100%" stop-color="#8B3A2B"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#bgGrad)" stroke-width="1" opacity="0.6">
+    <path d="M-50,700 C 200,650 350,760 550,700 C 750,640 900,720 1150,660 C 1300,630 1400,650 1450,640"/>
+    <path d="M-50,740 C 200,690 350,800 550,740 C 750,680 900,760 1150,700 C 1300,670 1400,690 1450,680"/>
+    <path d="M-50,780 C 200,730 350,840 550,780 C 750,720 900,800 1150,740 C 1300,710 1400,730 1450,720"/>
+    <path d="M-50,660 C 220,600 380,690 560,630 C 760,570 920,650 1160,590 C 1310,560 1400,580 1450,570"/>
+    <path d="M-50,620 C 220,560 380,650 560,590 C 760,530 920,610 1160,550 C 1310,520 1400,540 1450,530"/>
+  </g>
+</svg>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Profile Tool · Field Correction</p>
+    <h1>Ridgeline</h1>
+    <p class="sub" style="color:var(--ink-soft)">Paste or upload a distance–elevation table. Ridgeline strips single-point noise spikes and eases the transitions into natural, walkable slopes — rendered in a hypsometric elevation tint, low to high.</p>
+  </header>
+
+  <div class="grid">
+    <div class="panel controls">
+      <div>
+        <div class="field-label">Data (X, Y — one pair per line)</div>
+        <textarea id="dataInput" spellcheck="false"></textarea>
+      </div>
+      <label class="filebtn">
+        Upload CSV
+        <input type="file" id="fileInput" accept=".csv,.txt">
+      </label>
+
+      <div>
+        <div class="field-label">Despike strength <span class="val" id="kernelVal">2</span></div>
+        <input type="range" id="kernelSlider" min="0" max="6" step="1" value="2">
+      </div>
+
+      <div>
+        <div class="field-label">Slope smoothness <span class="val" id="sigmaVal">6.0</span></div>
+        <input type="range" id="sigmaSlider" min="0" max="15" step="0.5" value="6">
+      </div>
+
+      <div class="toggle-row">
+        <div class="field-label">Show raw trace</div>
+        <label class="switch">
+          <input type="checkbox" id="showRaw" checked>
+          <span class="slider-tog"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel chart-panel">
+      <div class="chart-head">
+        <div>
+          <h2 id="chartTitle">Elevation profile</h2>
+          <div class="elev-legend">
+            <span class="lab">Low</span><div class="bar"></div><span class="lab">High</span>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="sw raw"></i>Raw</span>
+          <span><i class="sw smooth"></i>Smoothed</span>
+        </div>
+      </div>
+      <div id="chartHolder"><svg id="chart" viewBox="0 0 900 460"></svg></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:20px; max-width:300px;">
+    <div class="stats">
+      <h3>Readout</h3>
+      <div class="stat-row"><span class="k">Points</span><span class="v" id="statPoints">—</span></div>
+      <div class="stat-row"><span class="k">Distance</span><span class="v" id="statDist">—</span></div>
+      <div class="stat-row"><span class="k">Elevation range</span><span class="v" id="statRange">—</span></div>
+      <div class="stat-row"><span class="k">Spikes removed</span><span class="v delta" id="statSpikes">—</span></div>
+      <div class="stat-row"><span class="k">Raw direction changes</span><span class="v" id="statRawWig">—</span></div>
+      <div class="stat-row"><span class="k">Smoothed direction changes</span><span class="v delta" id="statSmoothWig">—</span></div>
+    </div>
+    <button class="downloadbtn" id="downloadBtn">Download smoothed CSV</button>
+  </div>
+
+  <footer>Ridgeline — runs entirely in your browser. No data leaves this page. · Created by Nirjhar Jyoti Biswas</footer>
+</div>
+
+<script>
+const SAMPLE = `X,Y
+0,1
+0.252707581,1
+0.505415162,1
+0.758122744,1
+1.010830325,1
+1.263537906,1
+1.516245487,1
+1.768953069,1
+2.02166065,1
+2.274368231,1
+2.527075812,1
+2.779783394,1
+3.032490975,1
+3.285198556,1
+3.537906137,1
+3.790613718,1
+4.0433213,1
+4.296028881,1
+4.548736462,1
+4.801444043,1
+5.054151625,1
+5.306859206,1
+5.559566787,1
+5.812274368,1
+6.064981949,2
+6.317689531,1
+6.570397112,2
+6.823104693,2
+7.075812274,2
+7.328519856,2
+7.581227437,2
+7.833935018,2
+8.086642599,2
+8.339350181,2
+8.592057762,2
+9.097472924,2
+9.602888087,2
+10.10830325,2
+10.61371841,2
+11.11913357,2
+11.62454874,2
+12.1299639,2
+12.63537906,2
+13.14079422,2
+13.64620939,2
+14.15162455,2
+14.65703971,2
+15.16245487,2
+15.66787004,2
+16.1732852,2
+16.67870036,2
+17.18411552,2
+17.68953069,2
+18.19494585,2
+18.70036101,2
+19.20577617,2
+19.71119134,2
+20.2166065,2
+20.72202166,2
+21.22743682,2
+21.73285199,2
+22.23826715,2
+22.74368231,2
+23.24909747,2
+23.75451264,2
+24.2599278,2
+24.76534296,2
+25.27075812,2
+25.77617329,2
+26.28158845,2
+26.78700361,2
+27.29241877,2
+27.79783394,2
+28.3032491,2
+28.80866426,2
+29.31407942,2
+29.81949458,2
+30.32490975,2
+30.83032491,2
+31.33574007,2
+31.84115523,2
+32.3465704,2
+32.85198556,2
+33.35740072,2
+33.86281588,2
+34.36823105,2
+34.87364621,2
+35.37906137,2
+35.88447653,2
+36.3898917,2
+36.89530686,2
+37.40072202,2
+37.90613718,2
+38.41155235,2
+38.91696751,2
+39.42238267,2
+39.92779783,2
+40.433213,2
+40.93862816,2
+41.44404332,2
+41.94945848,2
+42.45487365,2
+42.96028881,2
+43.46570397,2
+43.97111913,2
+44.4765343,2
+44.98194946,2
+45.48736462,2
+45.99277978,2
+46.49819495,2
+47.00361011,2
+47.50902527,2
+48.01444043,2
+48.5198556,2
+49.02527076,2
+49.53068592,2
+50.03610108,2
+50.54151625,2
+51.04693141,2
+51.55234657,2
+52.05776173,2
+52.5631769,2
+53.06859206,2
+53.57400722,2
+54.07942238,2
+54.58483755,2
+55.09025271,2
+55.59566787,2
+56.10108303,2
+56.60649819,2
+57.11191336,3
+57.36462094,2
+57.61732852,2
+57.8700361,2
+58.12274368,2
+58.37545126,2
+58.62815884,2
+58.88086643,2
+59.13357401,2
+59.38628159,2
+59.63898917,2
+59.89169675,2
+60.14440433,3
+60.39711191,3
+60.64981949,3
+60.90252708,3
+61.15523466,3
+61.40794224,3
+61.66064982,3
+61.9133574,3
+62.16606498,2
+62.41877256,3
+62.67148014,3
+62.92418773,3
+63.17689531,3
+63.42960289,3
+63.68231047,3
+63.93501805,3
+64.18772563,3
+64.44043321,3
+64.69314079,3
+64.94584838,3
+65.19855596,3
+65.45126354,3
+65.70397112,3
+65.9566787,3
+66.20938628,3
+66.46209386,3
+66.71480144,3
+66.96750903,3
+67.22021661,3
+67.47292419,3
+67.72563177,3
+67.97833935,3
+68.23104693,3
+68.48375451,3
+68.73646209,3
+68.98916968,3
+69.24187726,3
+69.49458484,3
+69.74729242,3
+70,3`;
+
+const dataInput = document.getElementById('dataInput');
+const fileInput = document.getElementById('fileInput');
+const kernelSlider = document.getElementById('kernelSlider');
+const sigmaSlider = document.getElementById('sigmaSlider');
+const kernelVal = document.getElementById('kernelVal');
+const sigmaVal = document.getElementById('sigmaVal');
+const showRaw = document.getElementById('showRaw');
+const downloadBtn = document.getElementById('downloadBtn');
+
+dataInput.value = SAMPLE;
+
+function parseData(text){
+  const lines = text.trim().split(/\r?\n/);
+  const xs = [], ys = [];
+  for(const line of lines){
+    const t = line.trim();
+    if(!t) continue;
+    const parts = t.split(/[,\t\s]+/);
+    if(parts.length < 2) continue;
+    const x = parseFloat(parts[0]);
+    const y = parseFloat(parts[1]);
+    if(isNaN(x) || isNaN(y)) continue;
+    xs.push(x); ys.push(y);
+  }
+  return {xs, ys};
+}
+
+function medianFilter(arr, strength){
+  if(strength <= 0) return {out: arr.slice(), spikeIdx: new Set()};
+  const half = strength;
+  const n = arr.length;
+  const out = new Array(n);
+  const spikeIdx = new Set();
+  for(let i=0;i<n;i++){
+    const lo = Math.max(0, i-half);
+    const hi = Math.min(n-1, i+half);
+    const window = arr.slice(lo, hi+1).slice().sort((a,b)=>a-b);
+    const med = window[Math.floor(window.length/2)];
+    out[i] = med;
+    if(Math.abs(arr[i]-med) > 1e-9) spikeIdx.add(i);
+  }
+  return {out, spikeIdx};
+}
+
+function gaussianFilter(arr, sigma){
+  if(sigma <= 0) return arr.slice();
+  const radius = Math.max(1, Math.round(sigma*3));
+  const kernel = [];
+  let sum = 0;
+  for(let i=-radius;i<=radius;i++){
+    const v = Math.exp(-(i*i)/(2*sigma*sigma));
+    kernel.push(v); sum += v;
+  }
+  for(let i=0;i<kernel.length;i++) kernel[i] /= sum;
+  const n = arr.length;
+  const out = new Array(n).fill(0);
+  for(let i=0;i<n;i++){
+    let acc = 0;
+    for(let j=-radius;j<=radius;j++){
+      let idx = i+j;
+      if(idx < 0) idx = -idx;
+      if(idx >= n) idx = 2*(n-1)-idx;
+      idx = Math.max(0, Math.min(n-1, idx));
+      acc += arr[idx] * kernel[j+radius];
+    }
+    out[i] = acc;
+  }
+  return out;
+}
+
+function countDirectionChanges(ys){
+  let count = 0, prevDir = 0;
+  for(let i=1;i<ys.length;i++){
+    const d = ys[i]-ys[i-1];
+    const dir = d > 1e-6 ? 1 : (d < -1e-6 ? -1 : 0);
+    if(dir !== 0 && prevDir !== 0 && dir !== prevDir) count++;
+    if(dir !== 0) prevDir = dir;
+  }
+  return count;
+}
+
+function fmt(n, d=2){ return Number(n).toFixed(d); }
+
+let lastSmoothed = null, lastXs = null;
+
+function render(){
+  const {xs, ys} = parseData(dataInput.value);
+  const holder = document.getElementById('chartHolder');
+  const svg = document.getElementById('chart');
+
+  if(xs.length < 2){
+    svg.innerHTML = '';
+    holder.querySelector('.empty-msg')?.remove();
+    const msg = document.createElement('div');
+    msg.className = 'empty-msg';
+    msg.textContent = 'Paste at least two valid X, Y rows to see the profile.';
+    holder.appendChild(msg);
+    return;
+  }
+  holder.querySelector('.empty-msg')?.remove();
+
+  const kernel = parseInt(kernelSlider.value, 10);
+  const sigma = parseFloat(sigmaSlider.value);
+  kernelVal.textContent = kernel;
+  sigmaVal.textContent = sigma.toFixed(1);
+
+  const {out: median, spikeIdx} = medianFilter(ys, kernel);
+  const smoothed = gaussianFilter(median, sigma);
+  lastSmoothed = smoothed; lastXs = xs;
+
+  const W = 900, H = 460, padL = 46, padR = 16, padT = 16, padB = 34;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const allY = ys.concat(smoothed);
+  let yMin = Math.min(...allY), yMax = Math.max(...allY);
+  const pad = (yMax - yMin) * 0.12 || 1;
+  yMin -= pad; yMax += pad;
+
+  const sx = v => padL + ( (v - xMin) / (xMax - xMin || 1) ) * innerW;
+  const sy = v => padT + innerH - ( (v - yMin) / (yMax - yMin || 1) ) * innerH;
+
+  const path = (xarr, yarr) => xarr.map((x,i)=> (i===0?'M':'L') + sx(x).toFixed(2) + ',' + sy(yarr[i]).toFixed(2)).join(' ');
+
+  let gridSvg = '';
+  const yTicks = 5;
+  for(let i=0;i<=yTicks;i++){
+    const v = yMin + (i/yTicks)*(yMax-yMin);
+    const yy = sy(v);
+    gridSvg += `<line class="gridline" x1="${padL}" y1="${yy.toFixed(1)}" x2="${W-padR}" y2="${yy.toFixed(1)}"/>`;
+    gridSvg += `<text class="axis-label" x="${padL-8}" y="${(yy+3).toFixed(1)}" text-anchor="end">${fmt(v,1)}</text>`;
+  }
+  const xTicks = 6;
+  for(let i=0;i<=xTicks;i++){
+    const v = xMin + (i/xTicks)*(xMax-xMin);
+    const xx = sx(v);
+    gridSvg += `<text class="axis-label" x="${xx.toFixed(1)}" y="${H-padB+18}" text-anchor="middle">${fmt(v,0)}</text>`;
+  }
+
+  let spikesSvg = '';
+  spikeIdx.forEach(i=>{
+    spikesSvg += `<circle cx="${sx(xs[i]).toFixed(2)}" cy="${sy(ys[i]).toFixed(2)}" r="3.2" fill="none" stroke="#8B3A2B" stroke-width="1.4" opacity="0.85"/>`;
+  });
+
+  const rawPath = showRaw.checked ? `<path d="${path(xs, ys)}" fill="none" stroke="var(--raw)" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.6"/>` : '';
+  const smoothPath = `<path d="${path(xs, smoothed)}" fill="none" stroke="url(#elevStroke)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+  const areaPath = `${path(xs, smoothed)} L ${sx(xs[xs.length-1]).toFixed(2)},${(padT+innerH).toFixed(2)} L ${sx(xs[0]).toFixed(2)},${(padT+innerH).toFixed(2)} Z`;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="elevStroke" x1="0" y1="1" x2="0" y2="0" gradientUnits="objectBoundingBox">
+        <stop offset="0%" stop-color="#2F6B4A"/>
+        <stop offset="35%" stop-color="#8FA83C"/>
+        <stop offset="65%" stop-color="#E0B347"/>
+        <stop offset="85%" stop-color="#C1682B"/>
+        <stop offset="100%" stop-color="#8B3A2B"/>
+      </linearGradient>
+      <linearGradient id="elevArea" x1="0" y1="1" x2="0" y2="0" gradientUnits="objectBoundingBox">
+        <stop offset="0%" stop-color="#2F6B4A" stop-opacity="0.45"/>
+        <stop offset="35%" stop-color="#8FA83C" stop-opacity="0.30"/>
+        <stop offset="65%" stop-color="#E0B347" stop-opacity="0.22"/>
+        <stop offset="85%" stop-color="#C1682B" stop-opacity="0.16"/>
+        <stop offset="100%" stop-color="#8B3A2B" stop-opacity="0.10"/>
+      </linearGradient>
+    </defs>
+    ${gridSvg}
+    <path d="${areaPath}" fill="url(#elevArea)"/>
+    ${rawPath}
+    ${smoothPath}
+    ${spikesSvg}
+  `;
+
+  document.getElementById('statPoints').textContent = xs.length;
+  document.getElementById('statDist').textContent = fmt(xMax-xMin,1) + ' units';
+  document.getElementById('statRange').textContent = fmt(Math.min(...ys),2) + ' – ' + fmt(Math.max(...ys),2);
+  document.getElementById('statSpikes').textContent = spikeIdx.size;
+  document.getElementById('statRawWig').textContent = countDirectionChanges(ys);
+  document.getElementById('statSmoothWig').textContent = countDirectionChanges(smoothed);
+}
+
+dataInput.addEventListener('input', render);
+kernelSlider.addEventListener('input', render);
+sigmaSlider.addEventListener('input', render);
+showRaw.addEventListener('change', render);
+
+fileInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { dataInput.value = ev.target.result; render(); };
+  reader.readAsText(file);
+});
+
+downloadBtn.addEventListener('click', ()=>{
+  if(!lastSmoothed || !lastXs) return;
+  let csv = 'X,Y\n';
+  for(let i=0;i<lastXs.length;i++){
+    csv += `${lastXs[i]},${lastSmoothed[i].toFixed(4)}\n`;
+  }
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'smoothed_elevation_profile.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+render();
+</script>
+</body>
+</html>
